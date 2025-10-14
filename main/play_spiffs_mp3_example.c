@@ -35,11 +35,12 @@ static const char *mp3_files[NUM_DECODE_PIPELINES] = {
     "/spiffs/10.mp3",
     "/spiffs/09.mp3",
     "/spiffs/08.mp3",
-    "/spiffs/07.mp3"
+    "/spiffs/99.mp3",
 };
 
 void app_main(void)
 {
+    ESP_LOGI(TAG, "play_spiffs_mp3 1");
     audio_pipeline_handle_t pipelines[NUM_DECODE_PIPELINES];
     audio_element_handle_t spiffs_stream_readers[NUM_DECODE_PIPELINES];
     audio_element_handle_t mp3_decoders[NUM_DECODE_PIPELINES];
@@ -59,8 +60,8 @@ void app_main(void)
     periph_spiffs_cfg_t spiffs_cfg = {
         .root = "/spiffs",
         .partition_label = NULL,
-        .max_files = 5,
-        .format_if_mount_failed = true
+        .max_files = NUM_DECODE_PIPELINES,
+        .format_if_mount_failed = false 
     };
     esp_periph_handle_t spiffs_handle = periph_spiffs_init(&spiffs_cfg);
 
@@ -188,12 +189,17 @@ void app_main(void)
     audio_pipeline_set_listener(pipeline_mix, evt);
     audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
 
-    ESP_LOGI(TAG, "[ 5 ] Start audio_pipeline");
+    ESP_LOGI(TAG, "[ 5 ] Start audio_pipelines");
     for (int i = 0; i < NUM_DECODE_PIPELINES; i++) {
-        audio_pipeline_run(pipelines[i]);
+        if (audio_pipeline_run(pipelines[i]) != ESP_OK) {
+            printf(TAG, "ERROR: Failed to run pipeline %d for file %s", i, mp3_files[i]);
+            return;
+        }
     }
+    ESP_LOGI(TAG, "[ 5.1 ] Start mixer pipeline");
     audio_pipeline_run(pipeline_mix);
 
+    ESP_LOGI(TAG, "[ 5.2 ] Start downmixer");
     downmix_set_input_rb_timeout(mixer, 50, 0);
     downmix_set_work_mode(mixer, ESP_DOWNMIX_WORK_MODE_BYPASS);
 
